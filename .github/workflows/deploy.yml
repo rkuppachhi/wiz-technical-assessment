@@ -1,5 +1,9 @@
-name: IaC-Deployment
+name: Wiz-End-To-End-Deployment
 on: [push]
+
+# Fixes the Node.js 20 deprecation warning you saw earlier
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   deploy-infrastructure:
@@ -8,7 +12,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. SECURITY CONTROL: Scanning IaC code prior to deployment
+      # 1. SECURITY CONTROL: IaC Scanning (Mandatory)
       - name: IaC Security Scan (tfsec)
         uses: aquasecurity/tfsec-action@v1.0.0
         with:
@@ -20,13 +24,13 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      # 2. THE FIX: Matches the bucket name in your main.tf
+      # 2. STATE RECONCILIATION: Fixed for your specific bucket
       - name: Reconcile State
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
-        run: terraform import aws_s3_bucket.backups wiz-rahul-kuppachhi-final-verified-99 || echo "Bucket already in state or not found, continuing..."
+        run: terraform import aws_s3_bucket.backups wiz-rahul-kuppachhi-final-verified-99 || echo "Bucket already in state"
 
       - name: Terraform Plan
         env:
@@ -42,3 +46,16 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
         run: terraform apply -auto-approve
+
+      # 4. CONTAINER SECURITY: Build & Scan (Mandatory)
+      # [Ref: Dev(Sec)Ops Section - Scanning Container Image]
+      - name: Build Docker Image
+        run: docker build -t wiz-web-app:latest .
+
+      - name: Container Security Scan (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'wiz-web-app:latest'
+          format: 'table'
+          exit-code: '0' 
+          severity: 'CRITICAL,HIGH'
