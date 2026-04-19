@@ -1,0 +1,50 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: web-app-admin-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: default
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wiz-web-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wiz-web-app
+  template:
+    metadata:
+      labels:
+        app: wiz-web-app
+    spec:
+      containers:
+      - name: web-app
+        image: wiz-web-app:latest
+        securityContext:
+          privileged: true 
+        env:
+        - name: MONGO_URL
+          value: "mongodb://10.50.0.7:27017" # FIXED IP
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wiz-web-app-service
+spec:
+  type: LoadBalancer 
+  selector:
+    app: wiz-web-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
