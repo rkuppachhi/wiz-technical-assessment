@@ -67,7 +67,9 @@ resource "aws_subnet" "private_1c" {
   }
 }
 
-resource "aws_eip" "nat" { vpc = true }
+resource "aws_eip" "nat" { 
+  domain = "vpc" # FIXED: Changed 'vpc = true' to 'domain = "vpc"'
+}
 
 resource "aws_nat_gateway" "gw" {
   allocation_id = aws_eip.nat.id
