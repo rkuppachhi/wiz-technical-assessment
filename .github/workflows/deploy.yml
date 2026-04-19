@@ -6,7 +6,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
 
       # SECURITY CONTROL: Scanning the IaC code prior to deployment 
       # Ref: [Dev(Sec)Ops Section, Pipeline Security]
@@ -16,7 +17,7 @@ jobs:
           soft_fail: true
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
+        uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
         run: terraform init

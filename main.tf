@@ -70,6 +70,11 @@ resource "aws_security_group" "ssh_open" {
 resource "aws_instance" "mongo_vm" {
   ami                    = "ami-053b0d53c279acc90" 
   instance_type          = "t3.micro"
-  subnet_id              = aws_subnet.public_subnet.id # THIS LINE FIXES YOUR ERROR
+  subnet_id              = aws_subnet.public_subnet.id
   vpc_security_group_ids = [aws_security_group.ssh_open.id]
+
+  # THIS ENSURES THE NAME SHOWS IN THE CONSOLE
+  tags = {
+    Name = "Wiz-Vulnerable-VM"
+  }
 }
