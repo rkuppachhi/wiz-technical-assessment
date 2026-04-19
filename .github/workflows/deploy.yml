@@ -20,14 +20,13 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      # 2. THE FIX: Smart Import (Prevents BucketAlreadyExists errors)
-      # Replace 'wiz-rahul-final-deploy-v1' with the bucket name currently in your AWS console
+      # 2. THE FIX: Matches the bucket name in your main.tf
       - name: Reconcile State
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
-        run: terraform import aws_s3_bucket.backups wiz-rahul-final-deploy-v1 || echo "Bucket already in state or not found, continuing..."
+        run: terraform import aws_s3_bucket.backups wiz-rahul-kuppachhi-final-verified-99 || echo "Bucket already in state or not found, continuing..."
 
       - name: Terraform Plan
         env:
