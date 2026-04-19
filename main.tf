@@ -35,7 +35,7 @@ resource "aws_route_table_association" "a" {
 
 # 2. THE LEAKY BUCKET (Stays the same)
 resource "aws_s3_bucket" "backups" {
-  bucket = "wiz-rahul-backups-992288" # Ensure this is unique
+  bucket = "wiz-rahul-kuppachhi-unique-998877" # CHANGE THIS NAME
 }
 
 resource "aws_s3_bucket_public_access_block" "open" {
