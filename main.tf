@@ -2,19 +2,25 @@ provider "aws" {
   region = "us-east-1"
 }
 
-# 1. CREATE THE NETWORK (Required because Lab has no Default VPC)
+# This creates a random suffix so your S3 bucket name never collides again
+resource "random_string" "suffix" {
+  length  = 6
+  special = false
+  upper   = false
+}
+
+# 1. THE NETWORK (Custom VPC to avoid "No Default VPC" error)
 resource "aws_vpc" "wiz_vpc" {
   cidr_block = "10.0.0.0/16"
-  tags = { Name = "wiz-sovereign-vpc" }
+  tags = { Name = "wiz-final-vpc-${random_string.suffix.result}" }
 }
 
 resource "aws_subnet" "public_subnet" {
   vpc_id                  = aws_vpc.wiz_vpc.id
   cidr_block              = "10.0.1.0/24"
   map_public_ip_on_launch = true
-  availability_zone       = "us-east-1a" # THIS LINE FIXES THE ERROR
+  availability_zone       = "us-east-1a" # Fixes the zonal capacity error
 }
-
 
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.wiz_vpc.id
@@ -33,9 +39,9 @@ resource "aws_route_table_association" "a" {
   route_table_id = aws_route_table.public_rt.id
 }
 
-# 2. THE LEAKY BUCKET (Stays the same)
+# 2. THE LEAKY BUCKET (Requirement: "publicly readable and listable")
 resource "aws_s3_bucket" "backups" {
-  bucket = "wiz-rahul-kuppachhi-unique-998877" # CHANGE THIS NAME
+  bucket = "wiz-rahul-backup-${random_string.suffix.result}"
 }
 
 resource "aws_s3_bucket_public_access_block" "open" {
@@ -46,18 +52,16 @@ resource "aws_s3_bucket_public_access_block" "open" {
   restrict_public_buckets = false
 }
 
-# 3. THE SECURITY GROUP (Fixed to use the new VPC)
+# 3. THE SECURITY GROUP (Requirement: "SSH must be exposed to the public internet")
 resource "aws_security_group" "ssh_open" {
-  name   = "allow_all_ssh"
-  vpc_id = aws_vpc.wiz_vpc.id # THIS LINE FIXES YOUR ERROR
-
+  name   = "allow_all_ssh_${random_string.suffix.result}"
+  vpc_id = aws_vpc.wiz_vpc.id
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-
   egress {
     from_port   = 0
     to_port     = 0
@@ -66,15 +70,11 @@ resource "aws_security_group" "ssh_open" {
   }
 }
 
-# 4. THE VM (Fixed to use the new Subnet)
+# 4. THE VM (Requirement: "1+ year outdated version of Linux")
 resource "aws_instance" "mongo_vm" {
-  ami                    = "ami-053b0d53c279acc90" 
+  ami                    = "ami-053b0d53c279acc90" # Ubuntu 22.04
   instance_type          = "t3.micro"
   subnet_id              = aws_subnet.public_subnet.id
   vpc_security_group_ids = [aws_security_group.ssh_open.id]
-
-  # THIS ENSURES THE NAME SHOWS IN THE CONSOLE
-  tags = {
-    Name = "Wiz-Vulnerable-VM"
-  }
+  tags = { Name = "Wiz-Vulnerable-VM" }
 }
