@@ -44,7 +44,7 @@ resource "aws_iam_instance_profile" "vm_profile" {
   role = aws_iam_role.vm_admin.name
 }
 
-# 3. NETWORK: PRIVATE SUBNETS & NAT GATEWAY
+# 3. NETWORK (Using existing NAT Gateway — no new EIP needed)
 data "aws_vpc" "wiz" { id = "vpc-00482dedff0612c97" }
 
 resource "aws_subnet" "private_1b" {
@@ -67,20 +67,11 @@ resource "aws_subnet" "private_1c" {
   }
 }
 
-resource "aws_eip" "nat" { 
-  domain = "vpc" # FIXED: Changed 'vpc = true' to 'domain = "vpc"'
-}
-
-resource "aws_nat_gateway" "gw" {
-  allocation_id = aws_eip.nat.id
-  subnet_id     = "subnet-0c07814355cfccdae"
-}
-
 resource "aws_route_table" "private" {
   vpc_id = data.aws_vpc.wiz.id
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.gw.id
+    nat_gateway_id = "nat-0cdeec23a76d14158"
   }
 }
 

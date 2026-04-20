@@ -33,6 +33,7 @@ jobs:
         run: |
           terraform import aws_s3_bucket.backups wiz-rahul-kuppachhi-final-verified-99 || echo "Bucket already in state"
           terraform import aws_eks_cluster.wiz_cluster wiz-tasky-cluster || echo "EKS cluster already in state"
+          terraform import aws_eks_node_group.tasky_nodes wiz-tasky-cluster:tasky-workers || echo "Node group already in state"
 
       - name: Terraform Plan
         env:
