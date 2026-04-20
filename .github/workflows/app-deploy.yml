@@ -1,0 +1,73 @@
+name: App-Build-Deploy
+on:
+  workflow_run:
+    workflows: ["IaC-Deploy"]
+    types: [completed]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPO: wiz-tasky-app
+  EKS_CLUSTER: wiz-tasky-cluster
+
+jobs:
+  build-and-deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 1. Configure AWS credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # 2. Login to ECR
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 3. Build container image from Tasky Dockerfile
+      - name: Build Docker Image
+        run: |
+          ECR_URI=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO }}
+          docker build -t $ECR_URI:latest -t $ECR_URI:${{ github.sha }} ./tasky-main
+
+      # 4. Security scan before pushing (Container Image Scanning)
+      - name: Container Security Scan (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO }}:latest'
+          format: 'table'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
+
+      # 5. Push to ECR
+      - name: Push to ECR
+        run: |
+          ECR_URI=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO }}
+          docker push $ECR_URI:latest
+          docker push $ECR_URI:${{ github.sha }}
+
+      # 6. Configure kubectl
+      - name: Configure kubectl
+        run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
+
+      # 7. Deploy to Kubernetes
+      - name: Deploy to EKS
+        run: |
+          ECR_URI=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO }}
+          # Replace placeholder image with actual ECR URI
+          sed -i "s|PLACEHOLDER_ECR_IMAGE|$ECR_URI:${{ github.sha }}|g" k8s-deployment.yaml
+          kubectl apply -f k8s-deployment.yaml
+
+      # 8. Verify deployment
+      - name: Verify Deployment
+        run: |
+          kubectl rollout status deployment/wiz-web-app --timeout=120s
+          kubectl get pods -l app=wiz-web-app
+          kubectl get svc wiz-web-app-service
