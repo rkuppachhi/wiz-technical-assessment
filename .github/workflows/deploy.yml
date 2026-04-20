@@ -36,6 +36,9 @@ jobs:
           terraform import aws_eks_node_group.tasky_nodes wiz-tasky-cluster:tasky-workers || echo "Node group already in state"
           terraform import aws_subnet.private_1b subnet-05c55dbc61d4a2cae || echo "Subnet 1b already in state"
           terraform import aws_subnet.private_1c subnet-0394d68f69f91ae77 || echo "Subnet 1c already in state"
+          terraform import aws_route_table.private rtb-05a700b80ebe09301 || echo "Route table already in state"
+          terraform import aws_route_table_association.p1 rtbassoc-0c9e501f2aa270484 || echo "RT assoc p1 already in state"
+          terraform import aws_route_table_association.p2 rtbassoc-0652b20fbf38b622d || echo "RT assoc p2 already in state"
 
       - name: Terraform Plan
         env:
