@@ -49,7 +49,7 @@ data "aws_vpc" "wiz" { id = "vpc-00482dedff0612c97" }
 
 resource "aws_subnet" "private_1b" {
   vpc_id            = data.aws_vpc.wiz.id
-  cidr_block        = cidrsubnet(data.aws_vpc.wiz.cidr_block, 4, 1)
+  cidr_block        = cidrsubnet(data.aws_vpc.wiz.cidr_block, 4, 6)
   availability_zone = "us-east-1b"
   tags = { 
     Name = "wiz-private-1b"
@@ -59,7 +59,7 @@ resource "aws_subnet" "private_1b" {
 
 resource "aws_subnet" "private_1c" {
   vpc_id            = data.aws_vpc.wiz.id
-  cidr_block        = cidrsubnet(data.aws_vpc.wiz.cidr_block, 4, 2)
+  cidr_block        = cidrsubnet(data.aws_vpc.wiz.cidr_block, 4, 7)
   availability_zone = "us-east-1c"
   tags = { 
     Name = "wiz-private-1c"
