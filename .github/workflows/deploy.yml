@@ -39,6 +39,7 @@ jobs:
           terraform import aws_route_table.private rtb-05a700b80ebe09301 || echo "Route table already in state"
           terraform import aws_route_table_association.p1 subnet-05c55dbc61d4a2cae/rtb-05a700b80ebe09301 || echo "RT assoc p1 already in state"
           terraform import aws_route_table_association.p2 subnet-0394d68f69f91ae77/rtb-05a700b80ebe09301 || echo "RT assoc p2 already in state"
+          terraform import aws_instance.mongo_vm i-0348bcfe2c2c062c7 || echo "Mongo VM already in state"
           terraform import aws_ecr_repository.tasky wiz-tasky-app || echo "ECR already in state"
 
       - name: Terraform Plan
