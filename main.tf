@@ -248,3 +248,62 @@ resource "aws_iam_role_policy_attachment" "ecr_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
   role       = aws_iam_role.eks_nodes_role.name
 }
+
+# ========== CLOUD NATIVE SECURITY CONTROLS ==========
+
+# ---------- DETECTIVE CONTROL: GuardDuty ----------
+resource "aws_guardduty_detector" "main" {
+  enable = true
+}
+
+# ---------- DETECTIVE CONTROL: Security Hub ----------
+resource "aws_securityhub_account" "main" {}
+
+resource "aws_securityhub_standards_subscription" "aws_best_practices" {
+  depends_on    = [aws_securityhub_account.main]
+  standards_arn = "arn:aws:securityhub:us-east-1::standards/aws-foundational-security-best-practices/v/1.0.0"
+}
+
+# ---------- PREVENTATIVE CONTROL: AWS Config ----------
+resource "aws_iam_role" "config_role" {
+  name = "wiz-config-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "config.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "config_policy" {
+  role       = aws_iam_role.config_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWS_ConfigRole"
+}
+
+resource "aws_config_configuration_recorder" "main" {
+  name     = "wiz-config-recorder"
+  role_arn = aws_iam_role.config_role.arn
+}
+
+resource "aws_config_delivery_channel" "main" {
+  name           = "wiz-config-channel"
+  s3_bucket_name = aws_s3_bucket.backups.id
+  depends_on     = [aws_config_configuration_recorder.main]
+}
+
+resource "aws_config_configuration_recorder_status" "main" {
+  name       = aws_config_configuration_recorder.main.name
+  is_enabled = true
+  depends_on = [aws_config_delivery_channel.main]
+}
+
+resource "aws_config_config_rule" "restricted_ssh" {
+  name = "restricted-ssh"
+  source {
+    owner             = "AWS"
+    source_identifier = "INCOMING_SSH_TRAFFIC"
+  }
+  depends_on = [aws_config_configuration_recorder.main]
+}

@@ -35,7 +35,7 @@ spec:
           privileged: true
         env:
         - name: MONGODB_URI
-          value: "mongodb://10.50.0.100:27017"
+          value: "mongodb://admin:wizpassword123@10.50.0.100:27017/?authSource=admin"
         - name: SECRET_KEY
           value: "wiz-tasky-secret-key-2024"
         ports:
