@@ -41,6 +41,13 @@ jobs:
           terraform import aws_route_table_association.p2 subnet-0394d68f69f91ae77/rtb-05a700b80ebe09301 || echo "RT assoc p2 already in state"
           terraform import aws_instance.mongo_vm i-0348bcfe2c2c062c7 || echo "Mongo VM already in state"
           terraform import aws_ecr_repository.tasky wiz-tasky-app || echo "ECR already in state"
+          
+          # Security controls imports
+          DETECTOR_ID=$(aws guardduty list-detectors --query 'DetectorIds[0]' --output text 2>/dev/null || echo "")
+          if [ -n "$DETECTOR_ID" ] && [ "$DETECTOR_ID" != "None" ]; then
+            terraform import aws_guardduty_detector.main "$DETECTOR_ID" || echo "GuardDuty already in state"
+          fi
+          terraform import aws_securityhub_account.main 418272768854 || echo "SecurityHub already in state"
 
       - name: Terraform Plan
         env:

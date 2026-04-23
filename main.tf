@@ -39,6 +39,23 @@ resource "aws_s3_bucket_policy" "public_read" {
           aws_s3_bucket.backups.arn,
           "${aws_s3_bucket.backups.arn}/*"
         ]
+      },
+      {
+        Sid       = "AWSConfigBucketPermissionsCheck"
+        Effect    = "Allow"
+        Principal = { Service = "config.amazonaws.com" }
+        Action    = "s3:GetBucketAcl"
+        Resource  = aws_s3_bucket.backups.arn
+      },
+      {
+        Sid       = "AWSConfigBucketDelivery"
+        Effect    = "Allow"
+        Principal = { Service = "config.amazonaws.com" }
+        Action    = "s3:PutObject"
+        Resource  = "${aws_s3_bucket.backups.arn}/AWSLogs/*"
+        Condition = {
+          StringEquals = { "s3:x-amz-acl" = "bucket-owner-full-control" }
+        }
       }
     ]
   })
@@ -299,11 +316,11 @@ resource "aws_config_configuration_recorder_status" "main" {
   depends_on = [aws_config_delivery_channel.main]
 }
 
-resource "aws_config_config_rule" "restricted_ssh" {
-  name = "restricted-ssh"
+resource "aws_config_config_rule" "s3_public_read" {
+  name = "s3-bucket-public-read-prohibited"
   source {
     owner             = "AWS"
-    source_identifier = "INCOMING_SSH_TRAFFIC"
+    source_identifier = "S3_BUCKET_PUBLIC_READ_PROHIBITED"
   }
   depends_on = [aws_config_configuration_recorder.main]
 }
