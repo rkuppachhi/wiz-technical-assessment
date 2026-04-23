@@ -48,7 +48,9 @@ jobs:
             terraform import aws_guardduty_detector.main "$DETECTOR_ID" || echo "GuardDuty already in state"
           fi
           terraform import aws_securityhub_account.main 418272768854 || echo "SecurityHub already in state"
+          terraform import aws_securityhub_standards_subscription.aws_best_practices "arn:aws:securityhub:us-east-1::standards/aws-foundational-security-best-practices/v/1.0.0" || echo "SecurityHub subscription already in state"
           terraform import aws_iam_role.config_role wiz-config-role || echo "Config role already in state"
+          terraform import aws_iam_role_policy_attachment.config_policy wiz-config-role/arn:aws:iam::aws:policy/service-role/AWS_ConfigRole || echo "Config policy already in state"
           terraform import aws_config_configuration_recorder.main wiz-config-recorder || echo "Config recorder already in state"
 
       - name: Terraform Plan
