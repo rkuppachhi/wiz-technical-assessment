@@ -327,3 +327,50 @@ resource "aws_config_config_rule" "s3_public_read" {
   }
   depends_on = [aws_config_configuration_recorder.main]
 }
+
+# ---------- ALERTING: Security Hub Critical Findings → Email ----------
+resource "aws_sns_topic" "security_alerts" {
+  name = "wiz-security-alerts"
+}
+
+resource "aws_sns_topic_subscription" "email_alert" {
+  topic_arn = aws_sns_topic.security_alerts.arn
+  protocol  = "email"
+  endpoint  = "rahulkuppachhi@gmail.com"
+}
+
+resource "aws_cloudwatch_event_rule" "critical_findings" {
+  name        = "securityhub-critical-findings"
+  description = "Alert on Security Hub CRITICAL and HIGH findings"
+  event_pattern = jsonencode({
+    source      = ["aws.securityhub"]
+    detail-type = ["Security Hub Findings - Imported"]
+    detail = {
+      findings = {
+        Severity = {
+          Label = ["CRITICAL", "HIGH"]
+        }
+      }
+    }
+  })
+}
+
+resource "aws_cloudwatch_event_target" "sns_alert" {
+  rule      = aws_cloudwatch_event_rule.critical_findings.name
+  target_id = "send-to-sns"
+  arn       = aws_sns_topic.security_alerts.arn
+}
+
+resource "aws_sns_topic_policy" "allow_eventbridge" {
+  arn = aws_sns_topic.security_alerts.arn
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "AllowEventBridgePublish"
+      Effect    = "Allow"
+      Principal = { Service = "events.amazonaws.com" }
+      Action    = "sns:Publish"
+      Resource  = aws_sns_topic.security_alerts.arn
+    }]
+  })
+}
