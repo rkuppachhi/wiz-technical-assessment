@@ -52,6 +52,18 @@ jobs:
           terraform import aws_iam_role.config_role wiz-config-role || echo "Config role already in state"
           terraform import aws_iam_role_policy_attachment.config_policy wiz-config-role/arn:aws:iam::aws:policy/service-role/AWS_ConfigRole || echo "Config policy already in state"
           terraform import aws_config_configuration_recorder.main wiz-config-recorder || echo "Config recorder already in state"
+          terraform import aws_config_delivery_channel.main wiz-config-channel || echo "Config channel already in state"
+          terraform import aws_config_config_rule.s3_public_read s3-bucket-public-read-prohibited || echo "Config rule already in state"
+          terraform import aws_sns_topic.security_alerts arn:aws:sns:us-east-1:418272768854:wiz-security-alerts || echo "SNS topic already in state"
+          
+          # Import SNS subscription if it exists
+          SUB_ARN=$(aws sns list-subscriptions-by-topic --topic-arn arn:aws:sns:us-east-1:418272768854:wiz-security-alerts --query "Subscriptions[?Protocol=='email' && Endpoint=='rahulkuppachhi@gmail.com'].SubscriptionArn" --output text 2>/dev/null || echo "")
+          if [ -n "$SUB_ARN" ] && [ "$SUB_ARN" != "None" ] && [ "$SUB_ARN" != "Deleted" ] && [ "$SUB_ARN" != "PendingConfirmation" ]; then
+            terraform import aws_sns_topic_subscription.email_alert "$SUB_ARN" || echo "SNS sub already in state"
+          fi
+          
+          terraform import aws_cloudwatch_event_rule.critical_findings securityhub-critical-findings || echo "EventBridge rule already in state"
+          terraform import aws_cloudwatch_event_target.sns_alert securityhub-critical-findings/send-to-sns || echo "EventBridge target already in state"
 
       - name: Terraform Plan
         env:
