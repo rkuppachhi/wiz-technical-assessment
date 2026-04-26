@@ -1,13 +1,19 @@
+terraform {
+  backend "s3" {
+    bucket = "wiz-rahul-terraform-state"
+    key    = "terraform.tfstate"
+    region = "us-east-1"
+  }
+}
+
 provider "aws" {
   region = "us-east-1"
 }
 
 data "aws_caller_identity" "current" {}
 
-resource "random_string" "suffix" {
-  length  = 4
-  special = false
-  upper   = false
+locals {
+  suffix = "6jzc"
 }
 
 # 1. STORAGE
@@ -70,7 +76,7 @@ resource "aws_ecr_repository" "tasky" {
 
 # 2. OVERLY PERMISSIVE ROLE (VM Admin)
 resource "aws_iam_role" "vm_admin" {
-  name = "wiz-admin-role-rahul-${random_string.suffix.result}"
+  name = "wiz-admin-role-rahul-${local.suffix}"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -87,7 +93,7 @@ resource "aws_iam_role_policy_attachment" "admin_attach" {
 }
 
 resource "aws_iam_instance_profile" "vm_profile" {
-  name = "wiz-vm-profile-rahul-${random_string.suffix.result}"
+  name = "wiz-vm-profile-rahul-${local.suffix}"
   role = aws_iam_role.vm_admin.name
 }
 
@@ -161,7 +167,7 @@ resource "aws_route_table_association" "p2" {
 
 # 4. DATABASE VM
 resource "aws_security_group" "ssh_open" {
-  name   = "allow_ssh_rahul_${random_string.suffix.result}"
+  name   = "allow_ssh_rahul_${local.suffix}"
   vpc_id = data.aws_vpc.wiz.id
   ingress { 
     from_port   = 22
@@ -250,7 +256,7 @@ resource "aws_eks_node_group" "tasky_nodes" {
 
 # 6. EKS ROLES
 resource "aws_iam_role" "eks_cluster_role" {
-  name = "eks-cluster-role-${random_string.suffix.result}"
+  name = "eks-cluster-role-${local.suffix}"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{ 
@@ -267,7 +273,7 @@ resource "aws_iam_role_policy_attachment" "eks_policy" {
 }
 
 resource "aws_iam_role" "eks_nodes_role" {
-  name = "eks-node-role-${random_string.suffix.result}"
+  name = "eks-node-role-${local.suffix}"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{ 
@@ -430,7 +436,9 @@ resource "aws_guardduty_detector" "main" {
 }
 
 # ---------- DETECTIVE CONTROL: Security Hub ----------
-resource "aws_securityhub_account" "main" {}
+resource "aws_securityhub_account" "main" {
+  enable_default_standards = false
+}
 
 resource "aws_securityhub_standards_subscription" "aws_best_practices" {
   depends_on    = [aws_securityhub_account.main]
