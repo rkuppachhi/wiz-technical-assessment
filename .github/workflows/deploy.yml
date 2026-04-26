@@ -67,10 +67,24 @@ jobs:
           
           # WAF and LB Controller imports
           terraform import aws_iam_role.lb_controller wiz-alb-controller-role || echo "LB role already in state"
+          terraform import aws_iam_role_policy_attachment.lb_controller_policy wiz-alb-controller-role/arn:aws:iam::aws:policy/ElasticLoadBalancingFullAccess || echo "LB ELB policy already in state"
+          terraform import aws_iam_role_policy_attachment.lb_controller_ec2 wiz-alb-controller-role/arn:aws:iam::aws:policy/AmazonEC2FullAccess || echo "LB EC2 policy already in state"
+          terraform import aws_iam_role_policy_attachment.lb_controller_waf wiz-alb-controller-role/arn:aws:iam::aws:policy/AWSWAFFullAccess || echo "LB WAF policy already in state"
+          
+          # Import OIDC provider
+          OIDC_ARN=$(aws iam list-open-id-connect-providers --query "OpenIDConnectProviderList[?contains(Arn, 'oidc.eks')].Arn" --output text 2>/dev/null || echo "")
+          if [ -n "$OIDC_ARN" ]; then
+            terraform import aws_iam_openid_connect_provider.eks "$OIDC_ARN" || echo "OIDC already in state"
+          fi
+          
+          # Import subnet tags
+          terraform import aws_ec2_tag.public_1a_elb subnet-0c07814355cfccdae,kubernetes.io/role/elb || echo "Public subnet elb tag already in state"
+          terraform import aws_ec2_tag.public_1a_cluster subnet-0c07814355cfccdae,kubernetes.io/cluster/wiz-tasky-cluster || echo "Public subnet cluster tag already in state"
+          
+          # Import WAF
           WAF_ID=$(aws wafv2 list-web-acls --scope REGIONAL --query "WebACLs[?Name=='wiz-tasky-waf'].{Id:Id,LockToken:LockToken}" --output json 2>/dev/null)
           WAF_ACL_ID=$(echo $WAF_ID | jq -r '.[0].Id // empty')
           if [ -n "$WAF_ACL_ID" ]; then
-            WAF_ARN=$(aws wafv2 list-web-acls --scope REGIONAL --query "WebACLs[?Name=='wiz-tasky-waf'].ARN" --output text)
             terraform import aws_wafv2_web_acl.tasky "$WAF_ACL_ID/wiz-tasky-waf/REGIONAL" || echo "WAF already in state"
           fi
 
