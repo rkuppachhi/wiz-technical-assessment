@@ -40,6 +40,7 @@ spec:
           value: "wiz-tasky-secret-key-2024"
         ports:
         - containerPort: 8080
+---
 # --- SERVICE: NodePort for ALB Ingress ---
 apiVersion: v1
 kind: Service
