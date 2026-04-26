@@ -64,6 +64,15 @@ jobs:
           
           terraform import aws_cloudwatch_event_rule.critical_findings securityhub-critical-findings || echo "EventBridge rule already in state"
           terraform import aws_cloudwatch_event_target.sns_alert securityhub-critical-findings/send-to-sns || echo "EventBridge target already in state"
+          
+          # WAF and LB Controller imports
+          terraform import aws_iam_role.lb_controller wiz-alb-controller-role || echo "LB role already in state"
+          WAF_ID=$(aws wafv2 list-web-acls --scope REGIONAL --query "WebACLs[?Name=='wiz-tasky-waf'].{Id:Id,LockToken:LockToken}" --output json 2>/dev/null)
+          WAF_ACL_ID=$(echo $WAF_ID | jq -r '.[0].Id // empty')
+          if [ -n "$WAF_ACL_ID" ]; then
+            WAF_ARN=$(aws wafv2 list-web-acls --scope REGIONAL --query "WebACLs[?Name=='wiz-tasky-waf'].ARN" --output text)
+            terraform import aws_wafv2_web_acl.tasky "$WAF_ACL_ID/wiz-tasky-waf/REGIONAL" || echo "WAF already in state"
+          fi
 
       - name: Terraform Plan
         env:

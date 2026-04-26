@@ -94,13 +94,27 @@ resource "aws_iam_instance_profile" "vm_profile" {
 # 3. NETWORK (Using existing NAT Gateway — no new EIP needed)
 data "aws_vpc" "wiz" { id = "vpc-00482dedff0612c97" }
 
+# Tag existing public subnets for ALB discovery
+resource "aws_ec2_tag" "public_1a_elb" {
+  resource_id = "subnet-0c07814355cfccdae"
+  key         = "kubernetes.io/role/elb"
+  value       = "1"
+}
+
+resource "aws_ec2_tag" "public_1a_cluster" {
+  resource_id = "subnet-0c07814355cfccdae"
+  key         = "kubernetes.io/cluster/wiz-tasky-cluster"
+  value       = "shared"
+}
+
 resource "aws_subnet" "private_1b" {
   vpc_id            = data.aws_vpc.wiz.id
   cidr_block        = "10.50.4.0/24"
   availability_zone = "us-east-1b"
   tags = { 
     Name = "wiz-private-1b"
-    "kubernetes.io/role/internal-elb" = "1" 
+    "kubernetes.io/role/internal-elb" = "1"
+    "kubernetes.io/cluster/wiz-tasky-cluster" = "shared"
   }
 }
 
@@ -110,7 +124,8 @@ resource "aws_subnet" "private_1c" {
   availability_zone = "us-east-1c"
   tags = { 
     Name = "wiz-private-1c"
-    "kubernetes.io/role/internal-elb" = "1" 
+    "kubernetes.io/role/internal-elb" = "1"
+    "kubernetes.io/cluster/wiz-tasky-cluster" = "shared"
   }
 }
 
@@ -264,6 +279,127 @@ resource "aws_iam_role_policy_attachment" "cni_policy" {
 resource "aws_iam_role_policy_attachment" "ecr_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
   role       = aws_iam_role.eks_nodes_role.name
+}
+
+# ========== OIDC + LB CONTROLLER IAM ==========
+data "tls_certificate" "eks" {
+  url = aws_eks_cluster.wiz_cluster.identity[0].oidc[0].issuer
+}
+
+resource "aws_iam_openid_connect_provider" "eks" {
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = [data.tls_certificate.eks.certificates[0].sha1_fingerprint]
+  url             = aws_eks_cluster.wiz_cluster.identity[0].oidc[0].issuer
+}
+
+resource "aws_iam_role" "lb_controller" {
+  name = "wiz-alb-controller-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.eks.arn
+      }
+      Action = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "${replace(aws_eks_cluster.wiz_cluster.identity[0].oidc[0].issuer, "https://", "")}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
+          "${replace(aws_eks_cluster.wiz_cluster.identity[0].oidc[0].issuer, "https://", "")}:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lb_controller_policy" {
+  role       = aws_iam_role.lb_controller.name
+  policy_arn = "arn:aws:iam::aws:policy/ElasticLoadBalancingFullAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "lb_controller_ec2" {
+  role       = aws_iam_role.lb_controller.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2FullAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "lb_controller_waf" {
+  role       = aws_iam_role.lb_controller.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSWAFFullAccess"
+}
+
+# ========== PREVENTATIVE CONTROL: WAF ==========
+resource "aws_wafv2_web_acl" "tasky" {
+  name        = "wiz-tasky-waf"
+  description = "WAF for Tasky app - blocks SQLi, XSS, and rate limits"
+  scope       = "REGIONAL"
+
+  default_action { allow {} }
+
+  rule {
+    name     = "AWS-AWSManagedRulesSQLiRuleSet"
+    priority = 1
+    override_action { none {} }
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesSQLiRuleSet"
+        vendor_name = "AWS"
+      }
+    }
+    visibility_config {
+      sampled_requests_enabled   = true
+      cloudwatch_metrics_enabled = true
+      metric_name                = "SQLiRuleMetric"
+    }
+  }
+
+  rule {
+    name     = "AWS-AWSManagedRulesCommonRuleSet"
+    priority = 2
+    override_action { none {} }
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesCommonRuleSet"
+        vendor_name = "AWS"
+      }
+    }
+    visibility_config {
+      sampled_requests_enabled   = true
+      cloudwatch_metrics_enabled = true
+      metric_name                = "CommonRuleMetric"
+    }
+  }
+
+  rule {
+    name     = "RateLimit"
+    priority = 3
+    action { block {} }
+    statement {
+      rate_based_statement {
+        limit              = 1000
+        aggregate_key_type = "IP"
+      }
+    }
+    visibility_config {
+      sampled_requests_enabled   = true
+      cloudwatch_metrics_enabled = true
+      metric_name                = "RateLimitMetric"
+    }
+  }
+
+  visibility_config {
+    sampled_requests_enabled   = true
+    cloudwatch_metrics_enabled = true
+    metric_name                = "TaskyWAFMetric"
+  }
+}
+
+# Output WAF ACL ARN for k8s annotation
+output "waf_acl_arn" {
+  value = aws_wafv2_web_acl.tasky.arn
+}
+
+output "lb_controller_role_arn" {
+  value = aws_iam_role.lb_controller.arn
 }
 
 # ========== CLOUD NATIVE SECURITY CONTROLS ==========

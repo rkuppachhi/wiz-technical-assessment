@@ -57,17 +57,66 @@ jobs:
       - name: Configure kubectl
         run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
 
-      # 7. Deploy to Kubernetes
+      # 7. Install AWS Load Balancer Controller
+      - name: Install AWS Load Balancer Controller
+        run: |
+          # Get LB Controller role ARN
+          LB_ROLE_ARN=$(aws iam get-role --role-name wiz-alb-controller-role --query 'Role.Arn' --output text)
+          
+          # Install Helm
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          
+          # Add EKS Helm repo
+          helm repo add eks https://aws.github.io/eks-charts
+          helm repo update
+          
+          # Create service account for LB controller
+          kubectl apply -f - <<EOF
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: aws-load-balancer-controller
+            namespace: kube-system
+            annotations:
+              eks.amazonaws.com/role-arn: ${LB_ROLE_ARN}
+          EOF
+          
+          # Install/upgrade the controller
+          helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+            -n kube-system \
+            --set clusterName=${{ env.EKS_CLUSTER }} \
+            --set serviceAccount.create=false \
+            --set serviceAccount.name=aws-load-balancer-controller \
+            --set region=${{ env.AWS_REGION }} \
+            --set vpcId=vpc-00482dedff0612c97 \
+            --wait --timeout=120s
+
+      # 8. Deploy to Kubernetes
       - name: Deploy to EKS
         run: |
           ECR_URI=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO }}
-          # Replace placeholder image with actual ECR URI
+          
+          # Get WAF ACL ARN
+          WAF_ARN=$(aws wafv2 get-web-acl --name wiz-tasky-waf --scope REGIONAL --id $(aws wafv2 list-web-acls --scope REGIONAL --query "WebACLs[?Name=='wiz-tasky-waf'].Id" --output text) --query 'WebACL.ARN' --output text)
+          
+          # Replace placeholders
           sed -i "s|PLACEHOLDER_ECR_IMAGE|$ECR_URI:${{ github.sha }}|g" k8s-deployment.yaml
+          sed -i "s|WAF_ACL_ARN_PLACEHOLDER|$WAF_ARN|g" k8s-deployment.yaml
+          
+          # Delete old LoadBalancer service if exists
+          kubectl delete svc wiz-web-app-service --ignore-not-found=true
+          
           kubectl apply -f k8s-deployment.yaml
 
-      # 8. Verify deployment
+      # 9. Verify deployment
       - name: Verify Deployment
         run: |
           kubectl rollout status deployment/wiz-web-app --timeout=120s
           kubectl get pods -l app=wiz-web-app
           kubectl get svc wiz-web-app-service
+          echo "--- ALB Ingress ---"
+          kubectl get ingress wiz-web-app-ingress
+          echo "Waiting for ALB to provision..."
+          sleep 30
+          kubectl get ingress wiz-web-app-ingress -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+          echo ""
