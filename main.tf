@@ -94,7 +94,7 @@ resource "aws_iam_instance_profile" "vm_profile" {
 # 3. NETWORK (Using existing NAT Gateway — no new EIP needed)
 data "aws_vpc" "wiz" { id = "vpc-00482dedff0612c97" }
 
-# Tag existing public subnets for ALB discovery
+# Tag existing public subnets for ALB discovery (need 2 in different AZs)
 resource "aws_ec2_tag" "public_1a_elb" {
   resource_id = "subnet-0c07814355cfccdae"
   key         = "kubernetes.io/role/elb"
@@ -103,6 +103,18 @@ resource "aws_ec2_tag" "public_1a_elb" {
 
 resource "aws_ec2_tag" "public_1a_cluster" {
   resource_id = "subnet-0c07814355cfccdae"
+  key         = "kubernetes.io/cluster/wiz-tasky-cluster"
+  value       = "shared"
+}
+
+resource "aws_ec2_tag" "public_1c_elb" {
+  resource_id = "subnet-0cc2a9443933c6ff4"
+  key         = "kubernetes.io/role/elb"
+  value       = "1"
+}
+
+resource "aws_ec2_tag" "public_1c_cluster" {
+  resource_id = "subnet-0cc2a9443933c6ff4"
   key         = "kubernetes.io/cluster/wiz-tasky-cluster"
   value       = "shared"
 }

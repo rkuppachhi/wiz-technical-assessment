@@ -78,8 +78,10 @@ jobs:
           fi
           
           # Import subnet tags
-          terraform import aws_ec2_tag.public_1a_elb subnet-0c07814355cfccdae,kubernetes.io/role/elb || echo "Public subnet elb tag already in state"
-          terraform import aws_ec2_tag.public_1a_cluster subnet-0c07814355cfccdae,kubernetes.io/cluster/wiz-tasky-cluster || echo "Public subnet cluster tag already in state"
+          terraform import aws_ec2_tag.public_1a_elb subnet-0c07814355cfccdae,kubernetes.io/role/elb || echo "Public subnet 1a elb tag already in state"
+          terraform import aws_ec2_tag.public_1a_cluster subnet-0c07814355cfccdae,kubernetes.io/cluster/wiz-tasky-cluster || echo "Public subnet 1a cluster tag already in state"
+          terraform import aws_ec2_tag.public_1c_elb subnet-0cc2a9443933c6ff4,kubernetes.io/role/elb || echo "Public subnet 1c elb tag already in state"
+          terraform import aws_ec2_tag.public_1c_cluster subnet-0cc2a9443933c6ff4,kubernetes.io/cluster/wiz-tasky-cluster || echo "Public subnet 1c cluster tag already in state"
           
           # Import WAF
           WAF_ID=$(aws wafv2 list-web-acls --scope REGIONAL --query "WebACLs[?Name=='wiz-tasky-waf'].{Id:Id,LockToken:LockToken}" --output json 2>/dev/null)
