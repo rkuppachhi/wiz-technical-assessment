@@ -93,11 +93,20 @@ jobs:
 
       # 8. Deploy to Kubernetes
       - name: Deploy to EKS
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          APP_SECRET_KEY: ${{ secrets.APP_SECRET_KEY }}
         run: |
           ECR_URI=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO }}
           
           # Get WAF ACL ARN
           WAF_ARN=$(aws wafv2 get-web-acl --name wiz-tasky-waf --scope REGIONAL --id $(aws wafv2 list-web-acls --scope REGIONAL --query "WebACLs[?Name=='wiz-tasky-waf'].Id" --output text) --query 'WebACL.ARN' --output text)
+          
+          # Create/update Kubernetes Secret for app credentials
+          kubectl create secret generic tasky-secrets \
+            --from-literal=mongodb-uri="${MONGODB_URI}" \
+            --from-literal=secret-key="${APP_SECRET_KEY}" \
+            --dry-run=client -o yaml | kubectl apply -f -
           
           # Replace placeholders
           sed -i "s|PLACEHOLDER_ECR_IMAGE|$ECR_URI:${{ github.sha }}|g" k8s-deployment.yaml

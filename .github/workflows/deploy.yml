@@ -33,12 +33,13 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
+          TF_VAR_mongodb_password: ${{ secrets.MONGODB_PASSWORD }}
         run: terraform plan
 
-      # 3. IaC DEPLOYMENT
       - name: Terraform Apply
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
+          TF_VAR_mongodb_password: ${{ secrets.MONGODB_PASSWORD }}
         run: terraform apply -auto-approve

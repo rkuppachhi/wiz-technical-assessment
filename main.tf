@@ -12,6 +12,12 @@ provider "aws" {
 
 data "aws_caller_identity" "current" {}
 
+variable "mongodb_password" {
+  description = "MongoDB admin password"
+  type        = string
+  sensitive   = true
+}
+
 locals {
   suffix = "6jzc"
 }
@@ -217,7 +223,7 @@ systemctl enable mongod
 sleep 5
 
 # Create admin user
-mongo admin --eval 'db.createUser({user: "admin", pwd: "wizpassword123", roles: [{role: "root", db: "admin"}]})'
+mongo admin --eval 'db.createUser({user: "admin", pwd: "${var.mongodb_password}", roles: [{role: "root", db: "admin"}]})'
 
 # Enable authentication
 sed -i '/^#security:/a\\security:\n  authorization: enabled' /etc/mongod.conf
@@ -227,7 +233,7 @@ systemctl restart mongod
 apt-get install -y awscli
 
 # Daily backup cron job — dumps MongoDB to S3 bucket
-echo "0 2 * * * mongodump --uri='mongodb://admin:wizpassword123@localhost:27017' --authenticationDatabase=admin --out=/tmp/mongo-backup && aws s3 sync /tmp/mongo-backup s3://wiz-rahul-kuppachhi-final-verified-99/backups/\$(date +\%%Y-\%%m-\%%d)/ && rm -rf /tmp/mongo-backup" | crontab -
+echo "0 2 * * * mongodump --uri='mongodb://admin:${var.mongodb_password}@localhost:27017' --authenticationDatabase=admin --out=/tmp/mongo-backup && aws s3 sync /tmp/mongo-backup s3://wiz-rahul-kuppachhi-final-verified-99/backups/\$(date +\%%Y-\%%m-\%%d)/ && rm -rf /tmp/mongo-backup" | crontab -
 USERDATA
 }
 
